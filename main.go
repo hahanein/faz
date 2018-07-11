@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 
 	"golang.org/x/net/html"
 )
@@ -31,32 +32,35 @@ func main() {
 		log.Fatal(err)
 	}
 
-	for _, i := range v.Channel.Items {
-		fmt.Println(i.Title)
-	}
-
-	fmt.Println()
-	fmt.Println()
+	var wg sync.WaitGroup
 
 	for _, i := range v.Channel.Items {
-		fmt.Println(strings.ToUpper(i.Title))
-		fmt.Println()
+		wg.Add(1)
+		go func(i Item) {
+			defer wg.Done()
 
-		raw, err := Data(i.Link)
-		if err != nil {
-			log.Fatal(err)
-		}
+			raw, err := Data(i.Link)
+			if err != nil {
+				log.Fatal(err)
+			}
 
-		var data LdJson
+			var data LdJson
 
-		if err := json.Unmarshal([]byte(raw), &data); err != nil {
-			log.Fatal(err)
-		}
+			if err := json.Unmarshal([]byte(raw), &data); err != nil {
+				log.Fatal(err)
+			}
 
-		fmt.Println("\t", data.ArticleBody)
-		fmt.Println()
-		fmt.Println()
+			fmt.Println(strings.ToUpper(i.Title), "\n")
+			fmt.Println(data.ArticleBody, "\n\n")
+		}(i)
 	}
+
+	wg.Wait()
+}
+
+type Article struct {
+	Title string
+	Body  string
 }
 
 func Data(link string) (string, error) {
