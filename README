@@ -1,0 +1,5 @@
+DESCRIPTION
+	Download news from faz.net	
+
+USAGE
+	$ faz | fmt | less

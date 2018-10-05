@@ -14,8 +14,6 @@ import (
 )
 
 func main() {
-	var v RSS
-
 	resp, err := http.Get("http://www.faz.net/rss/aktuell/politik/")
 	if err != nil {
 		log.Fatal(err)
@@ -27,12 +25,15 @@ func main() {
 		log.Fatal(err)
 	}
 
+	var v RSS
 	err = xml.Unmarshal(body, &v)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	var wg sync.WaitGroup
+	var as []LdJson
+	mux := new(sync.Mutex)
 
 	for _, i := range v.Channel.Items {
 		wg.Add(1)
@@ -41,21 +42,29 @@ func main() {
 
 			raw, err := Data(i.Link)
 			if err != nil {
-				log.Fatal(err)
+				return
 			}
 
 			var data LdJson
 
 			if err := json.Unmarshal([]byte(raw), &data); err != nil {
-				log.Fatal(err)
+				return
 			}
 
-			fmt.Println(strings.ToUpper(i.Title), "\n")
-			fmt.Println(data.ArticleBody, "\n\n")
+			if data.Type == "Article" || data.Type == "NewsArticle" {
+				mux.Lock()
+				as = append(as, data)
+				mux.Unlock()
+			}
 		}(i)
 	}
 
 	wg.Wait()
+
+	for _, a := range as {
+		fmt.Println(strings.ToUpper(a.Headline), "\n")
+		fmt.Println(a.ArticleBody, "\n\n")
+	}
 }
 
 type Article struct {
