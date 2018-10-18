@@ -3,11 +3,10 @@ package main // import "github.com/hahanein/faz"
 import (
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
-	"strings"
 	"sync"
 
 	"golang.org/x/net/html"
@@ -16,24 +15,22 @@ import (
 func main() {
 	resp, err := http.Get("http://www.faz.net/rss/aktuell/politik/")
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	var v RSS
 	err = xml.Unmarshal(body, &v)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	var wg sync.WaitGroup
-	var as []LdJson
-	mux := new(sync.Mutex)
 
 	for _, i := range v.Channel.Items {
 		wg.Add(1)
@@ -52,19 +49,12 @@ func main() {
 			}
 
 			if data.Type == "Article" || data.Type == "NewsArticle" {
-				mux.Lock()
-				as = append(as, data)
-				mux.Unlock()
+				fmt.Print(data.Headline, "\n\n  ", data.ArticleBody, "\n\n")
 			}
 		}(i)
 	}
 
 	wg.Wait()
-
-	for _, a := range as {
-		fmt.Println(strings.ToUpper(a.Headline), "\n")
-		fmt.Println(a.ArticleBody, "\n\n")
-	}
 }
 
 type Article struct {
@@ -72,34 +62,35 @@ type Article struct {
 	Body  string
 }
 
-func Data(link string) (string, error) {
-	var res string
+func DataFromNode(n *html.Node) (string, error) {
+	if n.Type == html.ElementNode && n.Data == "script" {
+		for _, a := range n.Attr {
+			if a.Val == "application/ld+json" {
+				return n.FirstChild.Data, nil
+			}
+		}
+	}
 
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if s, err := DataFromNode(c); err == nil {
+			return s, nil
+		}
+	}
+
+	return "", errors.New("JSON-LD not found")
+}
+
+func Data(link string) (string, error) {
 	resp, err := http.Get(link)
 	if err != nil {
-		return res, err
+		return "", err
 	}
 	defer resp.Body.Close()
 
-	doc, err := html.Parse(resp.Body)
+	node, err := html.Parse(resp.Body)
 	if err != nil {
-		return res, err
+		return "", err
 	}
 
-	var f func(*html.Node)
-	f = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "script" {
-			for _, a := range n.Attr {
-				if a.Val == "application/ld+json" {
-					res = n.FirstChild.Data
-				}
-			}
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			f(c)
-		}
-	}
-	f(doc)
-
-	return res, nil
+	return DataFromNode(node)
 }
