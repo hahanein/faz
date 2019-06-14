@@ -57,11 +57,6 @@ func main() {
 	wg.Wait()
 }
 
-type Article struct {
-	Title string
-	Body  string
-}
-
 func DataFromNode(n *html.Node) (string, error) {
 	if n.Type == html.ElementNode && n.Data == "script" {
 		for _, a := range n.Attr {
