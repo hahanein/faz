@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	resp, err := http.Get("http://www.faz.net/rss/aktuell/politik/")
+	resp, err := http.Get("https://www.faz.net/rss/aktuell/politik/")
 	if err != nil {
 		panic(err)
 	}
