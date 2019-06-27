@@ -2,4 +2,4 @@ DESCRIPTION
 	Download news from faz.net	
 
 USAGE
-	$ faz | fmt | less
+	$ faz -resort politik | fmt | less

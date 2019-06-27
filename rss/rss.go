@@ -1,6 +1,30 @@
-package main
+package rss
 
-import "encoding/xml"
+import (
+	"encoding/xml"
+	"io/ioutil"
+	"net/http"
+)
+
+// Get fetches an RSS-Feed from a given URL.
+func Get(url string) (RSS, error) {
+	var res RSS
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return res, err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return res, err
+	}
+
+	err = xml.Unmarshal(body, &res)
+
+	return res, err
+}
 
 type Item struct {
 	Title       string `xml:"title"`

@@ -2,90 +2,62 @@ package main // import "github.com/hahanein/faz"
 
 import (
 	"encoding/json"
-	"encoding/xml"
-	"errors"
+	"flag"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"sync"
+	"os"
 
-	"golang.org/x/net/html"
+	"github.com/hahanein/faz/ldjson"
+	"github.com/hahanein/faz/rss"
 )
 
+const VERSION = "1.0.0"
+
 func main() {
-	resp, err := http.Get("https://www.faz.net/rss/aktuell/politik/")
+	var (
+		printVersion = flag.Bool("version", false, "Versionsnummer anzeigen und Programm beenden")
+
+		resort = flag.String("resort", "", "Resort")
+		format = flag.String("format", "plaintext", "Ausgabeformat")
+	)
+
+	flag.Parse()
+
+	if *printVersion {
+		fmt.Printf("faz v%s\n", VERSION)
+		return
+	}
+
+	r, err := rss.Get(fmt.Sprintf("https://www.faz.net/rss/aktuell/%s", *resort))
 	if err != nil {
 		panic(err)
 	}
-	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	var v RSS
-	err = xml.Unmarshal(body, &v)
-	if err != nil {
-		panic(err)
-	}
-
-	var wg sync.WaitGroup
-
-	for _, i := range v.Channel.Items {
-		wg.Add(1)
-		go func(i Item) {
-			defer wg.Done()
-
-			raw, err := Data(i.Link)
-			if err != nil {
-				return
-			}
-
-			var data LdJson
-
-			if err := json.Unmarshal([]byte(raw), &data); err != nil {
-				return
-			}
-
-			if data.Type == "Article" || data.Type == "NewsArticle" {
-				fmt.Print(data.Headline, "\n\n  ", data.ArticleBody, "\n\n")
-			}
-		}(i)
-	}
-
-	wg.Wait()
-}
-
-func DataFromNode(n *html.Node) (string, error) {
-	if n.Type == html.ElementNode && n.Data == "script" {
-		for _, a := range n.Attr {
-			if a.Val == "application/ld+json" {
-				return n.FirstChild.Data, nil
-			}
+	var as []ldjson.Article
+	for _, i := range r.Channel.Items {
+		a, err := ldjson.GetArticle(i.Link)
+		if err == ldjson.ErrNotFound {
+			continue
+		} else if err != nil {
+			panic(err)
 		}
+
+		as = append(as, a)
 	}
 
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		if s, err := DataFromNode(c); err == nil {
-			return s, nil
+	switch *format {
+	case "plaintext":
+		for _, a := range as {
+			fmt.Print(a.Plaintext())
 		}
+
+	case "json":
+		enc := json.NewEncoder(os.Stdout)
+
+		if err := enc.Encode(&as); err != nil {
+			panic(err)
+		}
+
+	default:
+		panic("Unbekanntes Ausgabeformat")
 	}
-
-	return "", errors.New("JSON-LD not found")
-}
-
-func Data(link string) (string, error) {
-	resp, err := http.Get(link)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	node, err := html.Parse(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	return DataFromNode(node)
 }
