@@ -41,7 +41,7 @@ func (a Article) Plaintext() string {
 	}
 
 	return fmt.Sprintf(
-		"\n%s\n\n%s\n\n\t%s\n\n",
+		"\n%s\n\n%s\n\n%s\n\n",
 		strings.TrimSpace(a.Headline),
 		authors,
 		strings.TrimSpace(a.ArticleBody),
