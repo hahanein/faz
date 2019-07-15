@@ -11,8 +11,9 @@ import (
 )
 
 type Article struct {
-	Context string `json:"@context"`
-	Type    string `json:"@type"`
+	Context          string           `json:"@context"`
+	Type             string           `json:"@type"`
+	MainEntityOfPage MainEntityOfPage `json:"mainEntityOfPage"`
 
 	Name         string   `json:"name"`
 	Description  string   `json:"description"`
@@ -27,25 +28,10 @@ type Article struct {
 	Authors Authors `json:"author"`
 }
 
-func (a Article) Plaintext() string {
-	var authors string
-
-	for i, author := range a.Authors {
-		authors = authors + strings.TrimSpace(author.Name)
-
-		if i+1 == len(a.Authors) {
-			continue
-		}
-
-		authors = authors + ", "
-	}
-
-	return fmt.Sprintf(
-		"\n%s\n\n%s\n\n%s\n\n",
-		strings.TrimSpace(a.Headline),
-		authors,
-		strings.TrimSpace(a.ArticleBody),
-	)
+type MainEntityOfPage struct {
+	Type string `json:"@type"`
+	Id   string `json:"@id"`
+	Url  string `json:"url"`
 }
 
 type Author struct {
@@ -78,6 +64,27 @@ func (as *Authors) UnmarshalJSON(b []byte) error {
 }
 
 var ErrNotFound = errors.New("Nicht gefunden")
+
+func (a Article) Plaintext() string {
+	var authors string
+
+	for i, author := range a.Authors {
+		authors = authors + strings.TrimSpace(author.Name)
+
+		if i+1 == len(a.Authors) {
+			continue
+		}
+
+		authors = authors + ", "
+	}
+
+	return fmt.Sprintf(
+		"\n%s\n\n%s\n\n%s\n\n",
+		strings.TrimSpace(a.Headline),
+		authors,
+		strings.TrimSpace(a.ArticleBody),
+	)
+}
 
 // ldjsonFromNode recursively scans an HTML-Node for JSON-LD content and
 // returns the first occurence. If not JSON-LD content can be found it returns

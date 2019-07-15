@@ -2,4 +2,4 @@ DESCRIPTION
 	Download news from faz.net	
 
 USAGE
-	$ faz -resort politik | fmt | less
+	$ faz -resorts politik,wirtschaft,finanzen | fmt | less
