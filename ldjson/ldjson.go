@@ -89,11 +89,19 @@ func (a Article) Plaintext() string {
 // ldjsonFromNode recursively scans an HTML-Node for JSON-LD content and
 // returns the first occurence. If not JSON-LD content can be found it returns
 // an error.
-func ldjsonFromNode(n *html.Node) (string, error) {
+func ldjsonFromNode(n *html.Node) (Article, error) {
+	var res Article
+
 	if n.Type == html.ElementNode && n.Data == "script" {
 		for _, a := range n.Attr {
 			if a.Val == "application/ld+json" {
-				return n.FirstChild.Data, nil
+				if err := json.Unmarshal([]byte(n.FirstChild.Data), &res); err != nil {
+					return res, err
+				}
+
+				if res.Type == "Article" || res.Type == "NewsArticle" {
+					return res, nil
+				}
 			}
 		}
 	}
@@ -104,37 +112,22 @@ func ldjsonFromNode(n *html.Node) (string, error) {
 		}
 	}
 
-	return "", ErrNotFound
+	return res, ErrNotFound
 }
 
 // GetArticle scans a webpage for an Article in the JSON-LD format and returns
 // the first occurence. Otherwise it returns an error.
 func GetArticle(url string) (Article, error) {
-	var res Article
-
 	resp, err := http.Get(url)
 	if err != nil {
-		return res, err
+		return Article{}, err
 	}
 	defer resp.Body.Close()
 
 	node, err := html.Parse(resp.Body)
 	if err != nil {
-		return res, err
+		return Article{}, err
 	}
 
-	raw, err := ldjsonFromNode(node)
-	if err != nil {
-		return res, err
-	}
-
-	if err := json.Unmarshal([]byte(raw), &res); err != nil {
-		return res, err
-	}
-
-	if res.Type == "Article" || res.Type == "NewsArticle" {
-		return res, nil
-	} else {
-		return res, ErrNotFound
-	}
+	return ldjsonFromNode(node)
 }
